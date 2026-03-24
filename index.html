@@ -438,7 +438,8 @@ async function fetchEarnings(){
       renderEarnings(est.today_estimated||0);
     }catch{renderEarnings(0);}
   }catch(e){
-    document.getElementById('earnList').innerHTML=`<div class="state"><span style="color:var(--danger)">${e.message}</span></div>`;
+    // Silent fail - don't show red banner for earnings errors
+    document.getElementById('earnList').innerHTML=`<div class="state"><span style="color:var(--text3)">Earnings indisponíveis</span></div>`;
   }
 }
 
@@ -737,20 +738,26 @@ async function reqNotif(){
   else alert('❌ Negado.\niPhone: Definições → Safari → Notificações → Permitir.');
 }
 async function sendTelegram(message){
-  if(!cfg.tgToken||!cfg.tgChatId||!cfg.proxyUrl)return;
+  if(!cfg.tgToken||!cfg.tgChatId)return;
   try{
-    await fetch(`${cfg.proxyUrl}/alert`,{
+    await fetch(`https://api.telegram.org/bot${cfg.tgToken}/sendMessage`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({token:cfg.tgToken,chatId:cfg.tgChatId,message})
+      body:JSON.stringify({chat_id:cfg.tgChatId,text:message,parse_mode:'HTML'})
     });
   }catch(e){console.error('Telegram error:',e);}
 }
 
 async function testTelegram(){
   if(!cfg.tgToken||!cfg.tgChatId){alert('Preenche o Token e Chat ID primeiro!');return;}
-  await sendTelegram('✅ <b>Mining Monitor</b>\nTelegram configurado com sucesso!\n\n⛏ Subconta: '+cfg.subaccount);
-  alert('Mensagem de teste enviada! Verifica o Telegram.');
+  const r=await fetch(`https://api.telegram.org/bot${cfg.tgToken}/sendMessage`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({chat_id:cfg.tgChatId,text:'✅ <b>Mining Monitor</b>\nTelegram configurado!\n\n⛏ Subconta: '+cfg.subaccount,parse_mode:'HTML'})
+  });
+  const d=await r.json();
+  if(d.ok)alert('✅ Mensagem enviada! Verifica o Telegram.');
+  else alert('❌ Erro: '+d.description);
 }
 
 function sendPush(title,body){if(Notification.permission==='granted')new Notification(title,{body,icon:'icon-192.png',requireInteraction:true,tag:'mining-alert',renotify:true});}
