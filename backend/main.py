@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 import httpx
 
-app = FastAPI(title="Mining Monitor Proxy", version="2.5")
+app = FastAPI(title="Mining Monitor Proxy", version="2.6")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,14 +24,33 @@ def auth_headers(request: Request):
 
 
 def parse_date(val):
-    """Extract YYYY-MM-DD from ISO date string"""
     if not val:
         return ""
     s = str(val)
-    # Format: 2022-03-23T00:00:00.000+00:00
     if len(s) >= 10 and s[4] == "-":
         return s[:10]
     return ""
+
+
+def to_btc(val):
+    try:
+        f = float(val)
+        if f > 100:
+            return f / 100_000_000
+        return f
+    except:
+        return 0.0
+
+
+async def send_telegram(token: str, chat_id: str, message: str):
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            await client.post(
+                f"https://api.telegram.org/bot{token}/sendMessage",
+                json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"}
+            )
+    except:
+        pass
 
 
 @app.get("/workers")
@@ -53,7 +72,6 @@ async def get_workers(request: Request, subaccount: str = ""):
     result = []
     for w in content:
         state = (w.get("state") or w.get("status") or "DEAD").upper()
-        # hashrates array [10m, 1h, 1d] in MH/s → TH/s
         hashrates = w.get("hashrates", [])
         if isinstance(hashrates, list) and len(hashrates) >= 2:
             hr_1h = float(hashrates[1] or 0) / 1_000_000
@@ -79,7 +97,6 @@ async def get_earnings(request: Request, subaccount: str = "", days: int = 30):
     to_date   = datetime.utcnow().date()
     from_date = to_date - timedelta(days=days)
 
-    # API uses startDate/endDate (v2 endpoint)
     params = {
         "startDate": str(from_date),
         "endDate":   str(to_date),
@@ -93,12 +110,12 @@ async def get_earnings(request: Request, subaccount: str = "", days: int = 30):
         resp = await client.get(f"{BASE}/api/external/v2/earnings", params=params, headers=headers)
 
     if resp.status_code != 200:
-        # fallback to v1
-        params2 = {"fromDate": str(from_date), "toDate": str(to_date), "page": 0, "size": 200}
+        # fallback v1
+        p2 = {"fromDate": str(from_date), "toDate": str(to_date), "page": 0, "size": 200}
         if subaccount:
-            params2["subaccountNames"] = subaccount
-        async with httpx.AsyncClient(timeout=15) as client2:
-            resp = await client2.get(f"{BASE}/api/external/v1/earnings", params=params2, headers=headers)
+            p2["subaccountNames"] = subaccount
+        async with httpx.AsyncClient(timeout=15) as c2:
+            resp = await c2.get(f"{BASE}/api/external/v1/earnings", params=p2, headers=headers)
         if resp.status_code != 200:
             raise HTTPException(status_code=resp.status_code, detail=resp.text)
 
@@ -109,18 +126,12 @@ async def get_earnings(request: Request, subaccount: str = "", days: int = 30):
     for e in content:
         # earningsFor = "2022-03-23T00:00:00.000+00:00"
         raw_date = (e.get("earningsFor") or e.get("paidOn") or
-                    e.get("date") or e.get("earningDate") or e.get("createdAt") or "")
+                    e.get("date") or e.get("earningDate") or "")
         date_str = parse_date(raw_date)
 
-        # netOwed is already in BTC (whole coin)
-        amount = float(e.get("netOwed") or e.get("amount") or e.get("totalEarnings") or 0)
-        fee    = float(e.get("fee") or e.get("poolFee") or e.get("feesPaid") or 0)
-
-        # If values seem to be in satoshis (very large), convert
-        if amount > 100:
-            amount = amount / 100_000_000
-        if fee > 100:
-            fee = fee / 100_000_000
+        # netOwed already in BTC
+        amount = to_btc(e.get("netOwed") or e.get("amount") or e.get("totalEarnings") or 0)
+        fee    = to_btc(e.get("fee") or e.get("feesPaid") or e.get("poolFee") or 0)
 
         result.append({
             "date":       date_str,
@@ -129,8 +140,6 @@ async def get_earnings(request: Request, subaccount: str = "", days: int = 30):
             "status":     e.get("state") or e.get("status") or "CONFIRMED",
             "subaccount": e.get("subaccountName") or subaccount,
             "coin":       e.get("coin", "BTC"),
-            "hashrate":   e.get("hashrate", 0),
-            "scheme":     e.get("earningScheme", "FPPS"),
         })
     result.sort(key=lambda x: x["date"], reverse=True)
     return result
@@ -138,7 +147,6 @@ async def get_earnings(request: Request, subaccount: str = "", days: int = 30):
 
 @app.get("/estimated")
 async def get_estimated(request: Request, subaccount: str = ""):
-    """Today and yesterday estimated revenue"""
     headers = auth_headers(request)
     params  = {}
     if subaccount:
@@ -150,31 +158,22 @@ async def get_estimated(request: Request, subaccount: str = ""):
     if resp.status_code != 200:
         return {"today_estimated": 0.0, "yesterday_estimated": 0.0}
 
-    data = resp.json()
-    # Response: {"estimatedRevenues": {"2022-01-20T00:...": [...], "2022-01-19T00:...": [...]}}
+    data      = resp.json()
     estimated = data.get("estimatedRevenues", {})
+    dates     = sorted(estimated.keys(), reverse=True)
 
-    dates = sorted(estimated.keys(), reverse=True)
     today_amt = 0.0
     yest_amt  = 0.0
 
     for i, date_key in enumerate(dates[:2]):
         entries = estimated[date_key]
-        total = 0.0
-        for e in entries:
-            amt = float(e.get("amount") or 0)
-            if amt > 100:
-                amt = amt / 100_000_000
-            total += amt
+        total   = sum(to_btc(e.get("amount") or 0) for e in entries)
         if i == 0:
             today_amt = total
         else:
-            yest_amt = total
+            yest_amt  = total
 
-    return {
-        "today_estimated":     round(today_amt, 8),
-        "yesterday_estimated": round(yest_amt, 8),
-    }
+    return {"today_estimated": round(today_amt, 8), "yesterday_estimated": round(yest_amt, 8)}
 
 
 @app.get("/payments")
@@ -183,12 +182,7 @@ async def get_payments(request: Request, subaccount: str = "", days: int = 90):
     to_date   = datetime.utcnow().date()
     from_date = to_date - timedelta(days=days)
 
-    params = {
-        "startDate": str(from_date),
-        "endDate":   str(to_date),
-        "page":      0,
-        "size":      100,
-    }
+    params = {"startDate": str(from_date), "endDate": str(to_date), "page": 0, "size": 100}
     if subaccount:
         params["vSubaccounts"] = subaccount
 
@@ -203,25 +197,35 @@ async def get_payments(request: Request, subaccount: str = "", days: int = 90):
 
     result = []
     for p in content:
-        # paidOn = "2022-03-23T20:30:04.107+00:00"
-        raw_date = (p.get("paidOn") or p.get("date") or p.get("paymentDate") or
-                    p.get("createdAt") or "")
+        raw_date = (p.get("paidOn") or p.get("date") or p.get("paymentDate") or "")
         date_str = parse_date(raw_date)
-
-        amount = float(p.get("amount") or p.get("totalAmount") or 0)
-        if amount > 100:
-            amount = amount / 100_000_000
+        amount   = to_btc(p.get("amount") or p.get("totalAmount") or 0)
 
         result.append({
             "date":    date_str,
             "amount":  f"{amount:.8f}",
-            "txId":    p.get("txId") or p.get("transactionId") or p.get("txHash") or "—",
+            "txId":    p.get("txId") or p.get("transactionId") or "—",
             "address": p.get("address") or p.get("payoutAddress") or "—",
             "status":  p.get("state") or p.get("status") or "CONFIRMED",
             "coin":    p.get("coin", "BTC"),
         })
     result.sort(key=lambda x: x["date"], reverse=True)
     return result
+
+
+@app.post("/alert")
+async def send_alert(request: Request):
+    """Called by frontend to send Telegram alert"""
+    body = await request.json()
+    token   = body.get("token", "")
+    chat_id = body.get("chatId", "")
+    message = body.get("message", "")
+
+    if not token or not chat_id or not message:
+        raise HTTPException(status_code=400, detail="Missing token, chatId or message")
+
+    await send_telegram(token, chat_id, message)
+    return {"ok": True}
 
 
 @app.get("/health")
