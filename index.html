@@ -506,6 +506,7 @@ let prevStates={}; // {name: {status, belowThresh}}
 // ─── HASHRATE HISTORY ────────────────────────────────────────────────────────
 // Stored per worker: [{time: ISO, hashrate, hashrateAvg}]
 let hrHistory={}; // {workerName: [...]}
+let toastTimer=null;
 const MAX_HISTORY=72; // 72 entries @ 1min = 12h
 
 // ─── BOOT ────────────────────────────────────────────────────────────────────
@@ -979,7 +980,6 @@ function renderPayments(){
 }
 
 // ─── TOAST ───────────────────────────────────────────────────────────────────
-let toastTimer=null;
 function showToast(msg,type='danger'){
   const t=document.getElementById('toast');
   const icons={danger:'🔴',warn:'⚠️',info:'✅'};
