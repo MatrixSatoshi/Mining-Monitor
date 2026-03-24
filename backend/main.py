@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime, timedelta
 import httpx
 
-app = FastAPI(title="Mining Monitor Proxy", version="2.1")
+app = FastAPI(title="Mining Monitor Proxy", version="2.2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -41,36 +41,29 @@ async def get_workers(request: Request, subaccount: str = ""):
 
     result = []
     for w in content:
-        status = (w.get("status") or w.get("workerStatus") or "DEAD").upper()
-        hashrate = float(
-            w.get("hashrate1HrAvg") or w.get("hashrate1MinAvg") or
-            w.get("hashrate") or w.get("currentHashrate") or 0
-        )
-        hashrate_avg = float(
-            w.get("hashrate24HrAvg") or w.get("hashrate1DayAvg") or
-            w.get("hashrateAvg") or hashrate or 0
-        )
+        # API uses "state" not "status"
+        state = (w.get("state") or w.get("status") or "DEAD").upper()
+
+        # hashrates is array [10m, 1h, 1d] in MH/s → convert to TH/s
+        hashrates = w.get("hashrates", [])
+        if isinstance(hashrates, list) and len(hashrates) >= 2:
+            hr_1h  = float(hashrates[1] or 0) / 1_000_000  # MH/s → TH/s
+            hr_1d  = float(hashrates[2] or 0) / 1_000_000 if len(hashrates) > 2 else hr_1h
+            hr_10m = float(hashrates[0] or 0) / 1_000_000
+        else:
+            hr_10m = float(w.get("hashrate") or 0)
+            hr_1h  = hr_10m
+            hr_1d  = hr_10m
+
         result.append({
             "name":          w.get("name") or w.get("workerName") or "unknown",
-            "status":        status,
-            "hashrate":      hashrate,
-            "hashrateAvg":   hashrate_avg,
+            "status":        state,
+            "hashrate":      round(hr_1h, 4),
+            "hashrateAvg":   round(hr_1d, 4),
             "lastShareTime": w.get("lastShareTime") or w.get("lastShare"),
-            "subaccount":    w.get("subaccountName", subaccount),
+            "subaccount":    w.get("subaccount") or w.get("subaccountName", subaccount),
         })
     return result
-
-
-@app.get("/debug/workers")
-async def debug_workers(request: Request, subaccount: str = ""):
-    """Debug endpoint - ver resposta raw da API SBICrypto"""
-    headers = auth_headers(request)
-    params  = {"size": 3}
-    if subaccount:
-        params["subaccountNames"] = subaccount
-    async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.get(f"{BASE}/api/external/v1/workers", params=params, headers=headers)
-    return {"status_code": resp.status_code, "raw": resp.json()}
 
 
 @app.get("/earnings")
@@ -142,23 +135,7 @@ async def get_payments(request: Request, subaccount: str = "", days: int = 90):
     result.sort(key=lambda x: x["date"], reverse=True)
     return result
 
-@app.get("/debug")
-async def debug(request: Request, subaccount: str = "BTC_Thrust_Wallet"):
-    key    = request.headers.get("x-api-key","")
-    secret = request.headers.get("x-api-secret","")
-    # Temporário: aceita via query params para testar no browser
-    key    = request.query_params.get("k", key)
-    secret = request.query_params.get("s", secret)
-    if not key or not secret:
-        raise HTTPException(status_code=401, detail="Pass ?k=APIKEY&s=SECRET")
-    headers = {"x-api-key": key, "x-api-secret": secret, "Accept": "application/json"}
-    async with httpx.AsyncClient(timeout=15) as client:
-        resp = await client.get(
-            f"{BASE}/api/external/v1/workers",
-            params={"subaccountNames": subaccount, "size": 3},
-            headers=headers
-        )
-    return resp.json()
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "ts": datetime.utcnow().isoformat()}
