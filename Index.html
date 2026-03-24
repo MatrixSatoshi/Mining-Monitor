@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Mining"/>
+  <meta name="theme-color" content="#07090d"/>
+  <title>Mining Monitor</title>
+  <link rel="manifest" href="manifest.json"/>
+  <link rel="apple-touch-icon" href="icon-192.png"/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    :root{
+      --bg:#07090d;--bg2:#0d1117;--surface:#111820;--surface2:#161e28;
+      --border:#1c2636;--border2:#243040;
+      --accent:#00d68f;--danger:#f0384a;--warn:#f59e0b;--btc:#f7931a;
+      --text:#dce8f5;--text2:#8898aa;--text3:#4a5a6e;
+      --mono:'IBM Plex Mono',monospace;--sans:'Inter',sans-serif;
+      --r:14px;--r-sm:10px;
+      --safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+    html{height:100%;background:var(--bg)}
+    body{min-height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;
+      line-height:1.5;-webkit-font-smoothing:antialiased;overflow-x:hidden;}
+    body::before{
+      content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 50% -20%,rgba(0,214,143,.06) 0%,transparent 70%),
+        linear-gradient(rgba(0,214,143,.018) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,214,143,.018) 1px,transparent 1px);
+      background-size:100% 100%,48px 48px,48px 48px;
+    }
+    #app{position:relative;z-index:1;max-width:430px;margin:0 auto;display:flex;flex-direction:column;
+      min-height:100dvh;padding-top:var(--safe-top);padding-bottom:calc(var(--safe-bot) + 68px);}
+
+    /* HEADER */
+    .hdr{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;}
+    .hdr-left{display:flex;flex-direction:column;gap:1px}
+    .hdr-eyebrow{font-family:var(--mono);font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--accent)}
+    .hdr-title{font-size:20px;font-weight:800;letter-spacing:-.5px;color:#fff;line-height:1.1}
+    .hdr-sub{font-family:var(--mono);font-size:10px;color:var(--text3);margin-top:2px}
+    .hdr-actions{display:flex;gap:8px}
+    .ico-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--border2);
+      background:var(--surface);color:var(--text2);display:flex;align-items:center;
+      justify-content:center;cursor:pointer;transition:.15s;flex-shrink:0;}
+    .ico-btn:hover{border-color:var(--accent);color:var(--accent)}
+    .ico-btn svg{width:16px;height:16px}
+
+    /* HERO */
+    .hero{margin:0 14px 14px;background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);
+      border:1px solid var(--border2);border-radius:18px;padding:18px;position:relative;overflow:hidden;}
+    .hero::before{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;
+      border-radius:50%;background:radial-gradient(circle,rgba(0,214,143,.08) 0%,transparent 65%);pointer-events:none;}
+    .hero-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px}
+    .hero-ratio{font-family:var(--mono);font-size:52px;line-height:1;letter-spacing:-3px}
+    .hero-ratio .n-on{color:var(--accent)}
+    .hero-ratio .sep{color:var(--border2);font-size:38px;margin:0 3px}
+    .hero-ratio .n-tot{color:var(--text3)}
+    .hero-label{font-size:11px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-top:2px}
+    .badge{display:flex;align-items:center;gap:6px;padding:7px 13px;border-radius:99px;
+      font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;}
+    .badge.ok  {background:rgba(0,214,143,.1);color:var(--accent);border:1px solid rgba(0,214,143,.22)}
+    .badge.warn{background:rgba(245,158,11,.1);color:var(--warn);border:1px solid rgba(245,158,11,.22)}
+    .badge.bad {background:rgba(240,56,74,.1);color:var(--danger);border:1px solid rgba(240,56,74,.22)}
+    .dot{width:7px;height:7px;border-radius:50%;animation:pulse 1.8s ease-in-out infinite}
+    .ok .dot{background:var(--accent)}.warn .dot{background:var(--warn)}.bad .dot{background:var(--danger)}
+    @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.85)}}
+    .hero-stats{display:grid;grid-template-columns:repeat(4,1fr);background:rgba(0,0,0,.25);
+      border-radius:12px;overflow:hidden;border:1px solid var(--border);}
+    .hs{padding:10px 10px 9px;display:flex;flex-direction:column;gap:2px;border-right:1px solid var(--border)}
+    .hs:last-child{border-right:none}
+    .hs-lbl{font-family:var(--mono);font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--text3)}
+    .hs-val{font-family:var(--mono);font-size:13px;color:#fff}
+    .hs-val.ok{color:var(--accent)}.hs-val.warn{color:var(--warn)}.hs-val.bad{color:var(--danger)}
+    .hs-unit{font-size:8px;color:var(--text3)}
+
+    /* TICK */
+    .tick{display:flex;align-items:center;gap:8px;padding:4px 18px 8px;font-family:var(--mono);font-size:10px;color:var(--text3)}
+    .tick-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:blink 2.2s infinite;flex-shrink:0}
+    @keyframes blink{0%,100%{opacity:1}50%{opacity:.1}}
+    .demo-notice{margin:0 14px 10px;padding:9px 12px;border-radius:10px;
+      background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.18);
+      font-family:var(--mono);font-size:10px;color:var(--warn);text-align:center;display:none;}
+
+    /* TABS */
+    .tabs{display:flex;gap:4px;margin:0 14px 12px;background:var(--surface);
+      border:1px solid var(--border);border-radius:12px;padding:4px;}
+    .tab{flex:1;padding:9px 4px;border-radius:9px;font-family:var(--sans);font-size:10px;
+      font-weight:600;letter-spacing:.3px;text-transform:uppercase;cursor:pointer;border:none;
+      background:transparent;color:var(--text3);transition:.15s;white-space:nowrap;}
+    .tab.on{background:var(--bg);color:var(--accent);border:1px solid var(--border2)}
+
+    /* PANELS */
+    .panel{display:none;flex-direction:column;gap:0}.panel.on{display:flex}
+
+    /* SECTION HDR */
+    .sec-hdr{display:flex;align-items:center;justify-content:space-between;padding:0 18px;margin-bottom:10px}
+    .sec-lbl{font-family:var(--mono);font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--text3)}
+    .filters{display:flex;gap:4px}
+    .ftab{padding:4px 10px;border-radius:7px;font-family:var(--mono);font-size:9px;letter-spacing:1px;
+      cursor:pointer;border:1px solid transparent;color:var(--text3);background:transparent;transition:.15s;}
+    .ftab.on{background:var(--surface2);border-color:var(--border2);color:var(--text)}
+
+    /* WORKER CARDS */
+    .workers{padding:0 14px;display:flex;flex-direction:column;gap:8px}
+    .wcard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+      padding:13px 15px;display:flex;align-items:center;gap:13px;
+      position:relative;overflow:hidden;transition:.12s;cursor:pointer;}
+    .wcard::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;border-radius:3px 0 0 3px}
+    .wcard.online::before{background:var(--accent)}.wcard.offline::before{background:var(--warn)}.wcard.dead::before{background:var(--danger)}
+    .wcard.dead{animation:cardFlash 1.4s ease-in-out infinite}
+    .wcard.below-thresh::before{background:var(--warn)}
+    @keyframes cardFlash{0%,100%{opacity:1}50%{opacity:.7}}
+    .wcard-led{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+    .online .wcard-led{background:var(--accent);box-shadow:0 0 8px rgba(0,214,143,.5)}
+    .offline .wcard-led{background:var(--warn);box-shadow:0 0 8px rgba(245,158,11,.5)}
+    .dead .wcard-led{background:var(--danger);box-shadow:0 0 8px rgba(240,56,74,.5)}
+    .below-thresh .wcard-led{background:var(--warn);box-shadow:0 0 8px rgba(245,158,11,.5)}
+    .wcard-body{flex:1;min-width:0}
+    .wcard-name{font-family:var(--mono);font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}
+    .wcard-meta{font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:2px}
+    .wcard-bar{margin-top:6px;height:2px;background:var(--border);border-radius:2px;overflow:hidden}
+    .wcard-bar-fill{height:100%;border-radius:2px;transition:width .7s ease}
+    .online .wcard-bar-fill{background:var(--accent)}.offline .wcard-bar-fill{background:var(--warn)}
+    .dead .wcard-bar-fill{background:var(--danger);width:0!important}
+    .below-thresh .wcard-bar-fill{background:var(--warn)}
+    .wcard-hr{text-align:right;flex-shrink:0}
+    .wcard-val{font-family:var(--mono);font-size:15px;font-weight:500}
+    .online .wcard-val{color:var(--accent)}.offline .wcard-val{color:var(--warn)}
+    .dead .wcard-val{color:var(--danger)}.below-thresh .wcard-val{color:var(--warn)}
+    .wcard-avg{font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:1px}
+    .wcard-unit{font-family:var(--mono);font-size:8px;color:var(--text3)}
+    .thresh-tag{display:inline-block;font-family:var(--mono);font-size:8px;letter-spacing:1px;
+      text-transform:uppercase;color:var(--warn);background:rgba(245,158,11,.12);
+      border:1px solid rgba(245,158,11,.2);border-radius:4px;padding:1px 5px;margin-top:2px;}
+
+    /* WORKER DETAIL MODAL */
+    .modal-bg{position:fixed;inset:0;z-index:150;background:rgba(0,0,0,.7);
+      backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:.2s;}
+    .modal-bg.on{opacity:1;pointer-events:all}
+    .modal{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);
+      width:100%;max-width:430px;z-index:151;background:var(--bg2);
+      border:1px solid var(--border2);border-bottom:none;border-radius:22px 22px 0 0;
+      padding:20px 18px calc(var(--safe-bot) + 24px);
+      transition:transform .3s cubic-bezier(.4,0,.2,1);max-height:85dvh;overflow-y:auto;}
+    .modal.on{transform:translateX(-50%) translateY(0)}
+    .modal-handle{width:38px;height:4px;border-radius:2px;background:var(--border2);margin:0 auto 18px}
+    .modal-title{font-family:var(--mono);font-size:14px;color:#fff;font-weight:600;margin-bottom:4px}
+    .modal-sub{font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:18px}
+
+    /* CHART */
+    .chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+      padding:14px;margin-bottom:16px;}
+    .chart-title{font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;
+      color:var(--text3);margin-bottom:12px;}
+    .chart-canvas{width:100%;height:100px;display:block}
+    .chart-axis{display:flex;justify-content:space-between;margin-top:4px}
+    .chart-axis span{font-family:var(--mono);font-size:8px;color:var(--text3)}
+
+    /* HISTORY TABLE */
+    .hist-table{display:flex;flex-direction:column;gap:6px}
+    .hist-row{display:flex;align-items:center;justify-content:space-between;
+      background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:9px 12px;}
+    .hist-time{font-family:var(--mono);font-size:10px;color:var(--text2)}
+    .hist-vals{display:flex;gap:16px;align-items:center}
+    .hist-val{font-family:var(--mono);font-size:12px;color:var(--accent)}
+    .hist-avg{font-family:var(--mono);font-size:10px;color:var(--text3)}
+
+    /* EARNINGS */
+    .earn-wrap{padding:0 14px;display:flex;flex-direction:column;gap:10px}
+    .earn-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .ecard{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+      padding:14px;display:flex;flex-direction:column;gap:3px;}
+    .ecard.hi{border-color:rgba(0,214,143,.2);background:rgba(0,214,143,.04)}
+    .ecard.btc{border-color:rgba(247,147,26,.2);background:rgba(247,147,26,.04)}
+    .ecard-lbl{font-family:var(--mono);font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--text3)}
+    .ecard-val{font-family:var(--mono);font-size:17px;color:#fff;margin-top:1px}
+    .ecard.hi .ecard-val{color:var(--accent)}.ecard.btc .ecard-val{color:var(--btc)}
+    .ecard-sub{font-family:var(--mono);font-size:9px;color:var(--text3)}
+    .earn-sec{font-family:var(--mono);font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--text3);padding:2px 0}
+    .earn-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);
+      padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+    .er-left{display:flex;flex-direction:column;gap:2px}
+    .er-date{font-family:var(--mono);font-size:11px;color:var(--text)}
+    .er-sub{font-family:var(--mono);font-size:9px;color:var(--text3)}
+    .er-right{text-align:right;flex-shrink:0}
+    .er-amt{font-family:var(--mono);font-size:13px;color:var(--btc)}
+    .chip{display:inline-block;padding:2px 8px;border-radius:5px;font-family:var(--mono);
+      font-size:8px;letter-spacing:1px;text-transform:uppercase;margin-top:3px;}
+    .chip.confirmed{color:var(--accent);background:rgba(0,214,143,.1)}
+    .chip.posted{color:var(--warn);background:rgba(245,158,11,.1)}
+    .chip.new{color:var(--text3);background:rgba(74,90,110,.15)}
+
+    /* PAYMENTS */
+    .pay-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:13px 14px}
+    .pay-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+    .pay-date{font-family:var(--mono);font-size:11px;color:var(--text)}
+    .pay-amt{font-family:var(--mono);font-size:15px;color:var(--btc);font-weight:500}
+    .pay-txid{font-family:var(--mono);font-size:9px;color:var(--text3);word-break:break-all;margin-top:3px}
+    .pay-addr{font-family:var(--mono);font-size:9px;color:var(--text3);word-break:break-all;margin-top:2px}
+
+    /* ALERTS */
+    .alerts-wrap{padding:0 14px;display:flex;flex-direction:column;gap:8px}
+    .alerts-toolbar{display:flex;align-items:center;justify-content:space-between;padding:0 18px;margin-bottom:10px}
+    .btn-clear{padding:5px 12px;border-radius:8px;font-family:var(--mono);font-size:9px;letter-spacing:1px;
+      cursor:pointer;border:1px solid var(--border2);background:transparent;color:var(--text3);
+      transition:.15s;text-transform:uppercase;}
+    .btn-clear:hover{border-color:var(--danger);color:var(--danger)}
+    .alert-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);
+      padding:12px 14px;display:flex;align-items:flex-start;gap:12px;}
+    .alert-item.up{border-left:3px solid var(--accent)}
+    .alert-item.down{border-left:3px solid var(--danger)}
+    .alert-item.warn{border-left:3px solid var(--warn)}
+    .alert-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+    .alert-body{flex:1;min-width:0}
+    .alert-msg{font-size:13px;color:var(--text);font-weight:500;line-height:1.3}
+    .alert-time{font-family:var(--mono);font-size:9px;color:var(--text3);margin-top:3px}
+    .alert-empty{text-align:center;padding:50px 20px;font-family:var(--mono);font-size:11px;color:var(--text3)}
+
+    /* STATES */
+    .state{display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:12px;padding:50px 20px;font-family:var(--mono);font-size:11px;color:var(--text3);text-align:center;}
+    .spin{width:28px;height:28px;border:2px solid var(--border2);border-top-color:var(--accent);
+      border-radius:50%;animation:spin .7s linear infinite;}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* TOAST */
+    .toast{position:fixed;top:calc(var(--safe-top) + 12px);left:50%;
+      transform:translateX(-50%) translateY(-140%);
+      width:calc(100% - 28px);max-width:400px;z-index:200;
+      border-radius:14px;padding:13px 16px;font-family:var(--mono);font-size:12px;font-weight:500;
+      display:flex;align-items:center;gap:10px;
+      transition:transform .3s cubic-bezier(.34,1.56,.64,1);backdrop-filter:blur(20px);}
+    .toast.show{transform:translateX(-50%) translateY(0)}
+    .toast.danger{background:rgba(240,56,74,.92);color:#fff;border:1px solid rgba(255,100,115,.3);box-shadow:0 8px 40px rgba(240,56,74,.35)}
+    .toast.warn{background:rgba(245,158,11,.92);color:#000;border:1px solid rgba(255,200,50,.3);box-shadow:0 8px 40px rgba(245,158,11,.35)}
+    .toast.info{background:rgba(0,214,143,.92);color:#000;border:1px solid rgba(0,255,180,.3);box-shadow:0 8px 40px rgba(0,214,143,.35)}
+    .toast-txt{flex:1;line-height:1.3}
+    .toast-close{cursor:pointer;opacity:.7;font-size:16px}
+
+    /* SETTINGS DRAWER */
+    .drawer-bg{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.65);
+      backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:.25s;}
+    .drawer-bg.on{opacity:1;pointer-events:all}
+    .drawer{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);
+      width:100%;max-width:430px;z-index:101;background:var(--bg2);
+      border:1px solid var(--border2);border-bottom:none;border-radius:22px 22px 0 0;
+      padding:20px 18px calc(var(--safe-bot) + 22px);
+      transition:transform .3s cubic-bezier(.4,0,.2,1);max-height:92dvh;overflow-y:auto;}
+    .drawer.on{transform:translateX(-50%) translateY(0)}
+    .drawer-handle{width:38px;height:4px;border-radius:2px;background:var(--border2);margin:0 auto 22px}
+    .drawer-title{font-family:var(--mono);font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--text3);margin-bottom:18px}
+    .drawer-section{font-family:var(--mono);font-size:8px;letter-spacing:3px;text-transform:uppercase;
+      color:var(--accent);margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+    .field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+    .field-lbl{font-family:var(--mono);font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--text3)}
+    .field-in{width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:10px;
+      padding:12px 14px;color:var(--text);font-family:var(--mono);font-size:12px;outline:none;transition:.15s;}
+    .field-in:focus{border-color:var(--accent)}
+    select.field-in{appearance:none}
+    .field-hint{font-family:var(--mono);font-size:9px;color:var(--text3)}
+    .field-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .thresh-preview{font-family:var(--mono);font-size:10px;color:var(--warn);margin-top:4px}
+    .btn-save{width:100%;padding:15px;border-radius:12px;background:var(--accent);color:#000;
+      font-family:var(--sans);font-size:14px;font-weight:700;letter-spacing:.5px;
+      border:none;cursor:pointer;transition:.15s;margin-bottom:10px;margin-top:4px;}
+    .btn-save:active{opacity:.8}
+    .btn-notif{width:100%;padding:13px;border-radius:12px;background:transparent;
+      color:var(--accent);font-family:var(--sans);font-size:13px;font-weight:600;
+      border:1px solid rgba(0,214,143,.25);cursor:pointer;transition:.15s;}
+    .btn-notif:hover{background:rgba(0,214,143,.06)}
+
+    /* BOTTOM NAV */
+    .bnav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+      width:100%;max-width:430px;z-index:50;background:rgba(7,9,13,.88);
+      backdrop-filter:blur(18px);border-top:1px solid var(--border);
+      padding:8px 0 calc(var(--safe-bot) + 6px);display:flex;}
+    .bn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+      font-family:var(--sans);font-size:9px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;
+      color:var(--text3);cursor:pointer;transition:.15s;padding:4px 0;position:relative;}
+    .bn.on{color:var(--accent)}
+    .bn svg{width:19px;height:19px}
+    .bn .bdot{position:absolute;top:3px;right:calc(50% - 13px);width:7px;height:7px;
+      border-radius:50%;background:var(--danger);border:1.5px solid var(--bg);display:none;}
+    .bn .bdot.show{display:block}
+    .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+    .scroll::-webkit-scrollbar{display:none}
+  </style>
+</head>
+<body>
+
+<div class="toast danger" id="toast">
+  <span id="toast-icon">⚠️</span>
+  <span class="toast-txt" id="toast-msg"></span>
+  <span class="toast-close" onclick="hideToast()">✕</span>
+</div>
+
+<!-- WORKER DETAIL MODAL -->
+<div class="modal-bg" id="modalBg" onclick="closeModal()"></div>
+<div class="modal" id="workerModal">
+  <div class="modal-handle"></div>
+  <div class="modal-title" id="modalTitle">Worker —</div>
+  <div class="modal-sub" id="modalSub">A carregar...</div>
+  <div class="chart-wrap">
+    <div class="chart-title">Hashrate — últimas 12h</div>
+    <canvas class="chart-canvas" id="hrChart" width="400" height="100"></canvas>
+    <div class="chart-axis">
+      <span id="chartXLeft">—</span>
+      <span id="chartXMid">—</span>
+      <span id="chartXRight">agora</span>
+    </div>
+  </div>
+  <div class="hist-table" id="histTable"></div>
+</div>
+
+<div id="app">
+  <div class="hdr">
+    <div class="hdr-left">
+      <span class="hdr-eyebrow">SBICrypto Pool</span>
+      <span class="hdr-title">Mining Monitor</span>
+      <span class="hdr-sub" id="subLabel">BTC_Thrust_Wallet</span>
+    </div>
+    <div class="hdr-actions">
+      <button class="ico-btn" onclick="refreshAll()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6"/><path d="M23 20v-6h-6"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+      </button>
+      <button class="ico-btn" onclick="openDrawer()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l-.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="hero-ratio">
+          <span class="n-on" id="cOn">—</span><span class="sep">/</span><span class="n-tot" id="cTot">—</span>
+        </div>
+        <div class="hero-label">Workers activos</div>
+      </div>
+      <div class="badge ok" id="mainBadge"><div class="dot"></div><span id="mainBadgeTxt">—</span></div>
+    </div>
+    <div class="hero-stats">
+      <div class="hs"><div class="hs-lbl">Total HR</div><div class="hs-val ok" id="hsTotalHR">—</div><div class="hs-unit">PH/s</div></div>
+      <div class="hs"><div class="hs-lbl">Média HR</div><div class="hs-val" id="hsAvgHR">—</div><div class="hs-unit">PH/s</div></div>
+      <div class="hs"><div class="hs-lbl">Offline</div><div class="hs-val warn" id="cOff">—</div></div>
+      <div class="hs"><div class="hs-lbl">Dead</div><div class="hs-val bad" id="cDead">—</div></div>
+    </div>
+  </div>
+
+  <div class="tick"><div class="tick-dot"></div><span id="tickTxt">A aguardar dados...</span></div>
+  <div class="demo-notice" id="demoNotice">MODO DEMO — Configura o Proxy URL nas definições ⚙</div>
+
+  <div class="tabs">
+    <button class="tab on"  onclick="goTab('workers',this)">⛏ Workers</button>
+    <button class="tab"     onclick="goTab('earn',this)">₿ Earnings</button>
+    <button class="tab"     onclick="goTab('pay',this)">💸 Pagamentos</button>
+    <button class="tab"     onclick="goTab('alerts',this)">🔔 Alertas</button>
+  </div>
+
+  <div class="scroll">
+
+    <!-- WORKERS -->
+    <div class="panel on" id="panel-workers">
+      <div class="sec-hdr">
+        <span class="sec-lbl">Workers <span id="wCountLbl" style="color:var(--text3)"></span></span>
+        <div class="filters">
+          <button class="ftab on" onclick="setF('ALL',this)">Todos</button>
+          <button class="ftab" onclick="setF('ONLINE',this)">Online</button>
+          <button class="ftab" onclick="setF('OFFLINE',this)">Offline</button>
+          <button class="ftab" onclick="setF('DEAD',this)">Dead</button>
+        </div>
+      </div>
+      <div class="workers" id="workersList">
+        <div class="state"><div class="spin"></div><span>A configurar...</span><span style="font-size:9px">Abre as definições ⚙</span></div>
+      </div>
+    </div>
+
+    <!-- EARNINGS -->
+    <div class="panel" id="panel-earn">
+      <div class="earn-wrap">
+        <div class="earn-grid">
+          <div class="ecard hi"><div class="ecard-lbl">Não pago</div><div class="ecard-val" id="eUnpaid">—</div><div class="ecard-sub">BTC pendente</div></div>
+          <div class="ecard btc"><div class="ecard-lbl">Este mês</div><div class="ecard-val" id="eMonth">—</div><div class="ecard-sub">BTC mês actual</div></div>
+          <div class="ecard"><div class="ecard-lbl">Hoje</div><div class="ecard-val" id="eToday">—</div><div class="ecard-sub">BTC hoje</div></div>
+          <div class="ecard"><div class="ecard-lbl">30 dias</div><div class="ecard-val" id="e30d">—</div><div class="ecard-sub">BTC total</div></div>
+        </div>
+        <div class="earn-sec">Histórico (30 dias)</div>
+        <div id="earnList"><div class="state"><div class="spin"></div></div></div>
+      </div>
+    </div>
+
+    <!-- PAYMENTS -->
+    <div class="panel" id="panel-pay">
+      <div class="earn-wrap">
+        <div class="earn-sec">Pagamentos recentes</div>
+        <div id="payList"><div class="state"><div class="spin"></div></div></div>
+      </div>
+    </div>
+
+    <!-- ALERTS -->
+    <div class="panel" id="panel-alerts">
+      <div class="alerts-toolbar">
+        <span class="sec-lbl">Histórico de alertas</span>
+        <button class="btn-clear" onclick="clearAlerts()">Limpar tudo</button>
+      </div>
+      <div class="alerts-wrap" id="alertsList">
+        <div class="alert-empty">Sem alertas registados</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SETTINGS DRAWER -->
+<div class="drawer-bg" id="drawerBg" onclick="closeDrawer()"></div>
+<div class="drawer" id="drawer">
+  <div class="drawer-handle"></div>
+  <div class="drawer-title">⚙ Configuração</div>
+
+  <div class="drawer-section">Ligação API</div>
+  <div class="field">
+    <label class="field-lbl">Proxy URL (Render.com)</label>
+    <input type="url" class="field-in" id="cfgProxy" placeholder="https://mining-xxxx.onrender.com"/>
+    <span class="field-hint">Deixa vazio para modo demo</span>
+  </div>
+  <div class="field">
+    <label class="field-lbl">API Key</label>
+    <input type="text" class="field-in" id="cfgKey" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+  </div>
+  <div class="field">
+    <label class="field-lbl">API Secret</label>
+    <input type="password" class="field-in" id="cfgSec" placeholder="••••••••••••••••••••"/>
+  </div>
+  <div class="field">
+    <label class="field-lbl">Subconta</label>
+    <input type="text" class="field-in" id="cfgSub" value="BTC_Thrust_Wallet"/>
+  </div>
+  <div class="field">
+    <label class="field-lbl">Actualização automática</label>
+    <select class="field-in" id="cfgInt">
+      <option value="30000">30 segundos</option>
+      <option value="60000" selected>1 minuto</option>
+      <option value="120000">2 minutos</option>
+      <option value="300000">5 minutos</option>
+    </select>
+  </div>
+
+  <div class="drawer-section">Alertas de Hashrate</div>
+  <div class="field">
+    <label class="field-lbl">Threshold de alerta (TH/s por worker)</label>
+    <div class="field-row">
+      <div class="field">
+        <label class="field-lbl">Mínimo TH/s</label>
+        <input type="number" class="field-in" id="cfgThresh" value="100" min="0" max="500" step="10" oninput="updateThreshPreview()"/>
+      </div>
+      <div class="field">
+        <label class="field-lbl">Tolerância (min)</label>
+        <input type="number" class="field-in" id="cfgThreshMin" value="5" min="1" max="60" step="1"/>
+      </div>
+    </div>
+    <div class="thresh-preview" id="threshPreview">⚠ Alerta se worker descer abaixo de 100 TH/s por ≥5 min</div>
+    <span class="field-hint">0 = alertar apenas quando worker para completamente</span>
+  </div>
+
+  <button class="btn-save" onclick="saveConfig()">💾 Guardar e ligar</button>
+  <button class="btn-notif" onclick="reqNotif()">🔔 Activar notificações push</button>
+</div>
+
+<!-- BOTTOM NAV -->
+<nav class="bnav">
+  <div class="bn on" id="bn-workers" onclick="goTab('workers',null,this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+    Workers
+  </div>
+  <div class="bn" id="bn-earn" onclick="goTab('earn',null,this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    Earnings
+  </div>
+  <div class="bn" id="bn-pay" onclick="goTab('pay',null,this)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+    Pagamentos
+  </div>
+  <div class="bn" id="bn-alerts" onclick="goTab('alerts',null,this)">
+    <div class="bdot" id="alertDot"></div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+    Alertas
+  </div>
+</nav>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let cfg={proxyUrl:'',apiKey:'',apiSecret:'',subaccount:'BTC_Thrust_Wallet',interval:60000,
+         thresh:100,threshMin:5};
+let workers=[], earnings=[], payments=[];
+let filt='ALL', pollTimer=null, maxHr=1;
+let alertLog=[];
+// Threshold violation tracking: {workerName: firstViolationTime}
+let threshViolations={};
+// Previous states for change detection
+let prevStates={}; // {name: {status, belowThresh}}
+
+// ─── HASHRATE HISTORY ────────────────────────────────────────────────────────
+// Stored per worker: [{time: ISO, hashrate, hashrateAvg}]
+let hrHistory={}; // {workerName: [...]}
+const MAX_HISTORY=72; // 72 entries @ 1min = 12h
+
+// ─── BOOT ────────────────────────────────────────────────────────────────────
+boot();
+function boot(){
+  try{const s=localStorage.getItem('miningCfg');if(s)cfg={...cfg,...JSON.parse(s)};}catch(e){}
+  try{const a=localStorage.getItem('miningAlerts');if(a)alertLog=JSON.parse(a);}catch(e){}
+  try{const h=localStorage.getItem('miningHistory');if(h)hrHistory=JSON.parse(h);}catch(e){}
+  populateDrawer();
+  document.getElementById('subLabel').textContent=cfg.subaccount;
+  if(!cfg.proxyUrl)document.getElementById('demoNotice').style.display='block';
+  updateThreshPreview();
+  renderAlerts();
+  updateAlertBadge();
+  if(cfg.apiKey&&cfg.apiSecret)startPoll();
+  else useDemoData();
+}
+
+function populateDrawer(){
+  document.getElementById('cfgProxy').value=cfg.proxyUrl;
+  document.getElementById('cfgKey').value=cfg.apiKey;
+  document.getElementById('cfgSec').value=cfg.apiSecret;
+  document.getElementById('cfgSub').value=cfg.subaccount;
+  document.getElementById('cfgInt').value=cfg.interval;
+  document.getElementById('cfgThresh').value=cfg.thresh;
+  document.getElementById('cfgThreshMin').value=cfg.threshMin;
+}
+
+function updateThreshPreview(){
+  const v=parseInt(document.getElementById('cfgThresh').value)||0;
+  const m=parseInt(document.getElementById('cfgThreshMin').value)||5;
+  const p=document.getElementById('threshPreview');
+  if(v===0){p.textContent='⚠ Alerta apenas quando worker para completamente (0 TH/s)';}
+  else{p.textContent=`⚠ Alerta se worker descer abaixo de ${v} TH/s por ≥${m} min`;}
+}
+
+function saveConfig(){
+  cfg.proxyUrl  =document.getElementById('cfgProxy').value.trim().replace(/\/$/,'');
+  cfg.apiKey    =document.getElementById('cfgKey').value.trim();
+  cfg.apiSecret =document.getElementById('cfgSec').value.trim();
+  cfg.subaccount=document.getElementById('cfgSub').value.trim();
+  cfg.interval  =parseInt(document.getElementById('cfgInt').value);
+  cfg.thresh    =parseInt(document.getElementById('cfgThresh').value)||0;
+  cfg.threshMin =parseInt(document.getElementById('cfgThreshMin').value)||5;
+  localStorage.setItem('miningCfg',JSON.stringify(cfg));
+  document.getElementById('subLabel').textContent=cfg.subaccount;
+  document.getElementById('demoNotice').style.display=cfg.proxyUrl?'none':'block';
+  closeDrawer();
+  startPoll();
+  fetchEarnings();
+  fetchPayments();
+}
+
+// ─── POLLING ─────────────────────────────────────────────────────────────────
+function startPoll(){
+  if(pollTimer)clearInterval(pollTimer);
+  fetchWorkers();
+  pollTimer=setInterval(fetchWorkers,cfg.interval);
+}
+function refreshAll(){fetchWorkers();fetchEarnings();fetchPayments();}
+
+// ─── API ─────────────────────────────────────────────────────────────────────
+async function fetchWorkers(){
+  if(!cfg.apiKey||!cfg.apiSecret){useDemoData();return;}
+  if(!cfg.proxyUrl){useDemoData();return;}
+  try{
+    const r=await fetch(`${cfg.proxyUrl}/workers?subaccount=${enc(cfg.subaccount)}`,
+      {headers:{'x-api-key':cfg.apiKey,'x-api-secret':cfg.apiSecret}});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    workers=await r.json();
+    recordHistory();
+    renderWorkers();
+  }catch(e){showToast('Erro workers: '+e.message,'danger');}
+}
+
+async function fetchEarnings(){
+  if(!cfg.apiKey||!cfg.apiSecret||!cfg.proxyUrl){useDemoEarnings();return;}
+  try{
+    const r=await fetch(`${cfg.proxyUrl}/earnings?subaccount=${enc(cfg.subaccount)}`,
+      {headers:{'x-api-key':cfg.apiKey,'x-api-secret':cfg.apiSecret}});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    earnings=await r.json();renderEarnings();
+  }catch(e){
+    document.getElementById('earnList').innerHTML=`<div class="state"><span style="color:var(--danger)">${e.message}</span></div>`;
+  }
+}
+
+async function fetchPayments(){
+  if(!cfg.apiKey||!cfg.apiSecret||!cfg.proxyUrl){useDemoPayments();return;}
+  try{
+    const r=await fetch(`${cfg.proxyUrl}/payments?subaccount=${enc(cfg.subaccount)}`,
+      {headers:{'x-api-key':cfg.apiKey,'x-api-secret':cfg.apiSecret}});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    payments=await r.json();renderPayments();
+  }catch(e){
+    document.getElementById('payList').innerHTML=`<div class="state"><span style="color:var(--danger)">${e.message}</span></div>`;
+  }
+}
+
+// ─── HISTORY RECORDING ───────────────────────────────────────────────────────
+function recordHistory(){
+  const now=new Date().toISOString();
+  workers.forEach(w=>{
+    if(!hrHistory[w.name])hrHistory[w.name]=[];
+    hrHistory[w.name].push({
+      time:now,
+      hashrate:w.hashrate||0,
+      hashrateAvg:w.hashrateAvg||w.hashrate||0
+    });
+    // Keep only last MAX_HISTORY entries
+    if(hrHistory[w.name].length>MAX_HISTORY)
+      hrHistory[w.name]=hrHistory[w.name].slice(-MAX_HISTORY);
+  });
+  try{localStorage.setItem('miningHistory',JSON.stringify(hrHistory));}catch(e){}
+}
+
+// ─── DEMO DATA ───────────────────────────────────────────────────────────────
+function useDemoData(){
+  const st=['ONLINE','ONLINE','ONLINE','ONLINE','ONLINE','ONLINE','ONLINE','ONLINE','OFFLINE','DEAD','ONLINE'];
+  workers=st.map((s,i)=>({
+    name:String(i+2).padStart(2,'0'),status:s,
+    hashrate:s==='DEAD'?0:s==='OFFLINE'?75+Math.random()*10:170+Math.random()*60,
+    hashrateAvg:s==='DEAD'?0:150+Math.random()*50,
+    lastShareTime:new Date(Date.now()-(s==='DEAD'?750000:s==='OFFLINE'?220000:20000)).toISOString()
+  }));
+  // Generate demo history
+  workers.forEach(w=>{
+    if(!hrHistory[w.name]||hrHistory[w.name].length<2){
+      hrHistory[w.name]=Array.from({length:24},(_,i)=>{
+        const t=new Date(Date.now()-(23-i)*5*60000);
+        const base=w.hashrate||0;
+        const jitter=(Math.random()-.5)*20;
+        return{time:t.toISOString(),hashrate:Math.max(0,base+jitter),hashrateAvg:Math.max(0,base+jitter*.5)};
+      });
+    }
+  });
+  renderWorkers();
+  useDemoEarnings();
+  useDemoPayments();
+}
+
+function useDemoEarnings(){
+  earnings=Array.from({length:30},(_,i)=>{
+    const d=new Date();d.setDate(d.getDate()-i);
+    return{date:d.toISOString().split('T')[0],
+      amount:(0.00038+Math.random()*0.00025).toFixed(8),
+      fee:(0.0000045).toFixed(8),
+      status:i===0?'NEW':i<3?'POSTED':'CONFIRMED'};
+  });
+  renderEarnings();
+}
+
+function useDemoPayments(){
+  payments=Array.from({length:12},(_,i)=>{
+    const d=new Date();d.setDate(d.getDate()-i*3);
+    return{date:d.toISOString().split('T')[0],
+      amount:(0.0011+Math.random()*0.0008).toFixed(8),
+      txId:'0x'+Array.from({length:12},()=>Math.floor(Math.random()*16).toString(16)).join('')+'...',
+      address:'bc1qthrustwallet...demo',status:i===0?'POSTED':'CONFIRMED'};
+  });
+  renderPayments();
+}
+
+// ─── RENDER WORKERS ──────────────────────────────────────────────────────────
+function renderWorkers(){
+  const online =workers.filter(w=>w.status==='ONLINE');
+  const offline=workers.filter(w=>w.status==='OFFLINE');
+  const dead   =workers.filter(w=>w.status==='DEAD');
+  const totalHR=workers.reduce((s,w)=>s+(w.hashrate||0),0)/1000;
+  const avgHR  =online.reduce((s,w)=>s+(w.hashrateAvg||w.hashrate||0),0)/1000;
+  maxHr=Math.max(...workers.map(w=>w.hashrate||0),1);
+
+  document.getElementById('cOn').textContent=online.length;
+  document.getElementById('cTot').textContent=workers.length;
+  document.getElementById('cOff').textContent=offline.length;
+  document.getElementById('cDead').textContent=dead.length;
+  document.getElementById('hsTotalHR').textContent=totalHR.toFixed(3);
+  document.getElementById('hsAvgHR').textContent=avgHR.toFixed(3);
+  document.getElementById('wCountLbl').textContent='('+workers.length+')';
+
+  const b=document.getElementById('mainBadge'),bt=document.getElementById('mainBadgeTxt');
+  b.className='badge';
+  if(dead.length>0){b.classList.add('bad');bt.textContent=dead.length+' DEAD';}
+  else if(offline.length>0){b.classList.add('warn');bt.textContent=offline.length+' OFFLINE';}
+  else{b.classList.add('ok');bt.textContent='ALL OK';}
+
+  document.getElementById('tickTxt').textContent=
+    `Actualizado às ${fmtTime(new Date())} · ${workers.length} workers`;
+
+  checkAlerts();
+  renderWorkerList();
+}
+
+function renderWorkerList(){
+  let list=filt==='ALL'?[...workers]:workers.filter(w=>w.status===filt);
+  const ord={DEAD:0,OFFLINE:1,ONLINE:2};
+  list.sort((a,b)=>ord[a.status]!==ord[b.status]?ord[a.status]-ord[b.status]:(b.hashrate||0)-(a.hashrate||0));
+
+  if(!list.length){
+    document.getElementById('workersList').innerHTML=`<div class="state"><span>Sem workers neste filtro</span></div>`;return;
+  }
+
+  document.getElementById('workersList').innerHTML=list.map(w=>{
+    const belowThresh=cfg.thresh>0&&w.status==='ONLINE'&&(w.hashrate||0)<cfg.thresh;
+    const cls=belowThresh?'online below-thresh':w.status.toLowerCase();
+    const hr=(w.hashrate||0).toFixed(1);
+    const avg=(w.hashrateAvg||w.hashrate||0).toFixed(1);
+    const pct=Math.min(100,((w.hashrate||0)/maxHr)*100);
+    const last=w.lastShareTime?fmtTime(new Date(w.lastShareTime)):'—';
+    const threshTag=belowThresh?`<span class="thresh-tag">⚠ abaixo de ${cfg.thresh} TH/s</span>`:'';
+    return`<div class="wcard ${cls}" onclick="openWorkerModal('${esc(w.name)}')">
+      <div class="wcard-led"></div>
+      <div class="wcard-body">
+        <div class="wcard-name">Worker ${esc(w.name)}</div>
+        <div class="wcard-meta">${w.status} · último share ${last} ${threshTag}</div>
+        <div class="wcard-bar"><div class="wcard-bar-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="wcard-hr">
+        <div class="wcard-val">${hr}</div>
+        <div class="wcard-avg">avg ${avg}</div>
+        <div class="wcard-unit">TH/s</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ─── WORKER DETAIL MODAL ─────────────────────────────────────────────────────
+function openWorkerModal(name){
+  const w=workers.find(x=>x.name===name);
+  if(!w)return;
+  const hist=hrHistory[name]||[];
+
+  document.getElementById('modalTitle').textContent=`Worker ${name}`;
+  document.getElementById('modalSub').textContent=
+    `${w.status} · Current: ${(w.hashrate||0).toFixed(1)} TH/s · Avg: ${(w.hashrateAvg||0).toFixed(1)} TH/s`;
+
+  // Chart
+  drawChart(hist);
+
+  // Axis labels
+  if(hist.length>=2){
+    const first=new Date(hist[0].time);
+    const mid=new Date(hist[Math.floor(hist.length/2)].time);
+    document.getElementById('chartXLeft').textContent=fmtTime(first);
+    document.getElementById('chartXMid').textContent=fmtTime(mid);
+  }
+
+  // History table — last 12 entries
+  const recent=[...hist].reverse().slice(0,12);
+  document.getElementById('histTable').innerHTML=recent.map(h=>`
+    <div class="hist-row">
+      <span class="hist-time">${fmtDateTime(new Date(h.time))}</span>
+      <div class="hist-vals">
+        <span class="hist-avg">${h.hashrateAvg.toFixed(1)} avg</span>
+        <span class="hist-val">${h.hashrate.toFixed(1)} TH/s</span>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('modalBg').classList.add('on');
+  document.getElementById('workerModal').classList.add('on');
+}
+
+function closeModal(){
+  document.getElementById('modalBg').classList.remove('on');
+  document.getElementById('workerModal').classList.remove('on');
+}
+
+// ─── CANVAS CHART ────────────────────────────────────────────────────────────
+function drawChart(hist){
+  const canvas=document.getElementById('hrChart');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||380;
+  const H=100;
+  canvas.width=W*2;canvas.height=H*2;ctx.scale(2,2);
+
+  ctx.clearRect(0,0,W,H);
+
+  if(hist.length<2){
+    ctx.fillStyle='rgba(220,232,245,.2)';ctx.font='11px IBM Plex Mono';
+    ctx.textAlign='center';ctx.fillText('Dados insuficientes',W/2,H/2);return;
+  }
+
+  const vals=hist.map(h=>h.hashrate);
+  const maxV=Math.max(...vals,1);
+  const minV=Math.min(...vals,0);
+  const range=maxV-minV||1;
+
+  const pad={t:8,r:8,b:4,l:8};
+  const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+
+  const xFor=i=>pad.l+(i/(hist.length-1))*cW;
+  const yFor=v=>pad.t+cH-(((v-minV)/range)*cH);
+
+  // Threshold line
+  if(cfg.thresh>0&&cfg.thresh<=maxV){
+    const ty=yFor(cfg.thresh);
+    ctx.beginPath();ctx.setLineDash([4,4]);
+    ctx.strokeStyle='rgba(245,158,11,.5)';ctx.lineWidth=1;
+    ctx.moveTo(pad.l,ty);ctx.lineTo(W-pad.r,ty);ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Area fill
+  ctx.beginPath();
+  hist.forEach((h,i)=>{
+    const x=xFor(i),y=yFor(h.hashrate);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.lineTo(xFor(hist.length-1),H-pad.b);
+  ctx.lineTo(xFor(0),H-pad.b);ctx.closePath();
+  const grad=ctx.createLinearGradient(0,pad.t,0,H-pad.b);
+  grad.addColorStop(0,'rgba(0,214,143,.25)');
+  grad.addColorStop(1,'rgba(0,214,143,.01)');
+  ctx.fillStyle=grad;ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  hist.forEach((h,i)=>{
+    const x=xFor(i),y=yFor(h.hashrate);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.strokeStyle='#00d68f';ctx.lineWidth=1.5;ctx.lineJoin='round';ctx.stroke();
+
+  // Last point dot
+  const lx=xFor(hist.length-1),ly=yFor(vals[vals.length-1]);
+  ctx.beginPath();ctx.arc(lx,ly,3,0,Math.PI*2);
+  ctx.fillStyle='#00d68f';ctx.fill();
+}
+
+// ─── ALERT ENGINE ────────────────────────────────────────────────────────────
+function checkAlerts(){
+  const now=Date.now();
+
+  workers.forEach(w=>{
+    const prev=prevStates[w.name]||{};
+    const belowThresh=cfg.thresh>0&&w.status==='ONLINE'&&(w.hashrate||0)<cfg.thresh;
+
+    // 1. Worker went DEAD
+    if(w.status==='DEAD'&&prev.status!=='DEAD'){
+      addAlert('down',`Worker ${w.name} → DEAD (0 TH/s)`,w.name);
+      sendPush('🔴 Worker DEAD',`Worker ${w.name} parou de minerar`);
+      showToast(`Worker ${w.name} DEAD — sem actividade`,'danger');
+    }
+
+    // 2. Worker went OFFLINE
+    if(w.status==='OFFLINE'&&prev.status==='ONLINE'){
+      addAlert('warn',`Worker ${w.name} → OFFLINE`,w.name);
+      sendPush('⚠️ Worker Offline',`Worker ${w.name} ficou offline`);
+      showToast(`Worker ${w.name} ficou offline`,'warn');
+    }
+
+    // 3. Worker recovered
+    if(w.status==='ONLINE'&&(prev.status==='DEAD'||prev.status==='OFFLINE')){
+      addAlert('up',`Worker ${w.name} → recuperado (${(w.hashrate||0).toFixed(1)} TH/s)`,w.name);
+      sendPush('✅ Worker online',`Worker ${w.name} voltou a minerar`);
+      showToast(`Worker ${w.name} voltou online`,'info');
+      delete threshViolations[w.name];
+    }
+
+    // 4. Below threshold (with time tolerance)
+    if(belowThresh){
+      if(!threshViolations[w.name]){
+        threshViolations[w.name]=now;
+      } else {
+        const elapsed=(now-threshViolations[w.name])/60000; // minutes
+        if(elapsed>=cfg.threshMin&&!prev.belowThreshAlerted){
+          addAlert('warn',
+            `Worker ${w.name} abaixo de ${cfg.thresh} TH/s durante ${Math.round(elapsed)} min (actual: ${(w.hashrate||0).toFixed(1)} TH/s)`,
+            w.name);
+          sendPush('⚠️ Hashrate baixo',`Worker ${w.name}: ${(w.hashrate||0).toFixed(1)} TH/s < ${cfg.thresh} TH/s`);
+          showToast(`Worker ${w.name}: hashrate abaixo do mínimo`,'warn');
+          prevStates[w.name]={...prev,belowThreshAlerted:true};
+        }
+      }
+    } else {
+      // Reset threshold violation
+      delete threshViolations[w.name];
+      if(prev.belowThreshAlerted){
+        prevStates[w.name]={...prev,belowThreshAlerted:false};
+      }
+    }
+
+    prevStates[w.name]={...prevStates[w.name],status:w.status,belowThresh};
+  });
+
+  // 5. Worker count change (add/remove miners)
+  const prevNames=new Set(Object.keys(prevStates));
+  const currNames=new Set(workers.map(w=>w.name));
+  workers.forEach(w=>{
+    if(!prevNames.has(w.name)&&prevNames.size>0){
+      addAlert('up',`Novo worker detectado: Worker ${w.name}`);
+      showToast(`Novo worker adicionado: ${w.name}`,'info');
+    }
+  });
+  prevNames.forEach(name=>{
+    if(!currNames.has(name)){
+      addAlert('down',`Worker ${name} removido da pool`);
+      showToast(`Worker ${name} removido`,'warn');
+    }
+  });
+}
+
+function addAlert(type,msg,workerName=''){
+  const entry={id:Date.now()+Math.random(),type,msg,time:new Date().toISOString(),workerName};
+  alertLog.unshift(entry);
+  if(alertLog.length>200)alertLog=alertLog.slice(0,200);
+  try{localStorage.setItem('miningAlerts',JSON.stringify(alertLog));}catch(e){}
+  renderAlerts();
+  updateAlertBadge();
+}
+
+function renderAlerts(){
+  const el=document.getElementById('alertsList');
+  if(!alertLog.length){el.innerHTML=`<div class="alert-empty">Sem alertas registados</div>`;return;}
+  el.innerHTML=alertLog.map(a=>{
+    const icon=a.type==='up'?'📈':a.type==='down'?'🔴':'⚠️';
+    return`<div class="alert-item ${a.type}">
+      <span class="alert-icon">${icon}</span>
+      <div class="alert-body">
+        <div class="alert-msg">${esc(a.msg)}</div>
+        <div class="alert-time">${fmtDateTime(new Date(a.time))}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function clearAlerts(){
+  if(!confirm('Limpar todo o histórico de alertas?'))return;
+  alertLog=[];
+  localStorage.removeItem('miningAlerts');
+  renderAlerts();
+  updateAlertBadge();
+}
+
+function updateAlertBadge(){
+  const last=parseInt(localStorage.getItem('alertsViewed')||'0');
+  const hasNew=alertLog.some(a=>new Date(a.time).getTime()>last);
+  document.getElementById('alertDot').classList.toggle('show',hasNew);
+}
+
+// ─── EARNINGS / PAYMENTS ─────────────────────────────────────────────────────
+function renderEarnings(){
+  if(!earnings.length){document.getElementById('earnList').innerHTML=`<div class="state"><span>Sem dados</span></div>`;return;}
+  const today=new Date().toISOString().split('T')[0];
+  const mon=today.substring(0,7);
+  let unpaid=0,todayA=0,monA=0,tot=0;
+  earnings.forEach(e=>{const a=parseFloat(e.amount)||0;tot+=a;
+    if(e.date===today)todayA+=a;if((e.date||'').startsWith(mon))monA+=a;
+    if(e.status==='NEW'||e.status==='POSTED')unpaid+=a;});
+  document.getElementById('eUnpaid').textContent=unpaid.toFixed(6);
+  document.getElementById('eMonth').textContent=monA.toFixed(6);
+  document.getElementById('eToday').textContent=todayA.toFixed(6);
+  document.getElementById('e30d').textContent=tot.toFixed(6);
+  document.getElementById('earnList').innerHTML=earnings.map(e=>{
+    const sc=(e.status||'').toLowerCase();
+    return`<div class="earn-row">
+      <div class="er-left"><div class="er-date">${e.date||'—'}</div><div class="er-sub">Fee: ${parseFloat(e.fee||0).toFixed(8)} BTC</div></div>
+      <div class="er-right"><div class="er-amt">₿ ${parseFloat(e.amount||0).toFixed(8)}</div><span class="chip ${sc}">${e.status||'—'}</span></div>
+    </div>`;}).join('');
+}
+
+function renderPayments(){
+  if(!payments.length){document.getElementById('payList').innerHTML=`<div class="state"><span>Sem pagamentos</span></div>`;return;}
+  document.getElementById('payList').innerHTML=`<div class="earn-wrap">`+payments.map(p=>{
+    const sc=(p.status||'').toLowerCase();
+    return`<div class="pay-row">
+      <div class="pay-top"><div><div class="pay-date">${p.date||'—'}</div><span class="chip ${sc}">${p.status||'—'}</span></div><div class="pay-amt">₿ ${parseFloat(p.amount||0).toFixed(8)}</div></div>
+      <div class="pay-txid">TX: ${esc(p.txId||'—')}</div>
+      <div class="pay-addr">→ ${esc(p.address||'—')}</div>
+    </div>`;}).join('')+'</div>';
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────────────
+let toastTimer=null;
+function showToast(msg,type='danger'){
+  const t=document.getElementById('toast');
+  const icons={danger:'🔴',warn:'⚠️',info:'✅'};
+  document.getElementById('toast-icon').textContent=icons[type]||'ℹ️';
+  document.getElementById('toast-msg').textContent=msg;
+  t.className='toast '+type+' show';
+  if(toastTimer)clearTimeout(toastTimer);
+  toastTimer=setTimeout(hideToast,5000);
+}
+function hideToast(){document.getElementById('toast').classList.remove('show');}
+
+// ─── PUSH ────────────────────────────────────────────────────────────────────
+async function reqNotif(){
+  if(!('Notification' in window)){alert('Browser não suporta notificações.');return;}
+  const p=await Notification.requestPermission();
+  if(p==='granted'){new Notification('Mining Monitor',{body:'✅ Notificações activadas!'});alert('✅ Notificações activadas!');}
+  else alert('❌ Negado.\niPhone: Definições → Safari → Notificações → Permitir.');
+}
+function sendPush(title,body){
+  if(Notification.permission==='granted')
+    new Notification(title,{body,icon:'icon-192.png',requireInteraction:true,tag:'mining-alert',renotify:true});
+}
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function goTab(id,tabEl,navEl){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('on'));
+  document.getElementById('panel-'+id).classList.add('on');
+  if(tabEl){document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));tabEl.classList.add('on');}
+  if(navEl){
+    document.querySelectorAll('.bn').forEach(n=>n.classList.remove('on'));navEl.classList.add('on');
+    const map={workers:0,earn:1,pay:2,alerts:3};
+    document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('on',i===map[id]));
+  }
+  if(id==='earn'&&!earnings.length)fetchEarnings();
+  if(id==='pay'&&!payments.length)fetchPayments();
+  if(id==='alerts'){
+    localStorage.setItem('alertsViewed',Date.now().toString());
+    document.getElementById('alertDot').classList.remove('show');
+  }
+}
+
+function setF(f,el){
+  filt=f;document.querySelectorAll('.ftab').forEach(t=>t.classList.remove('on'));
+  el.classList.add('on');if(workers.length)renderWorkerList();
+}
+
+// ─── DRAWER ──────────────────────────────────────────────────────────────────
+function openDrawer(){document.getElementById('drawer').classList.add('on');document.getElementById('drawerBg').classList.add('on');}
+function closeDrawer(){document.getElementById('drawer').classList.remove('on');document.getElementById('drawerBg').classList.remove('on');}
+
+// ─── UTILS ───────────────────────────────────────────────────────────────────
+function fmtTime(d){return d.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
+function fmtDateTime(d){
+  return d.toLocaleDateString('pt-PT',{day:'2-digit',month:'2-digit',year:'2-digit'})+' '+
+    d.toLocaleTimeString('pt-PT',{hour:'2-digit',minute:'2-digit'});
+}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function enc(s){return encodeURIComponent(s);}
+
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
