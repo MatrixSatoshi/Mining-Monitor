@@ -226,7 +226,27 @@ async def send_alert(request: Request):
 
     await send_telegram(token, chat_id, message)
     return {"ok": True}
-
+@app.get("/debug/raw")
+async def debug_raw(request: Request, subaccount: str = ""):
+    key = request.query_params.get("k","")
+    secret = request.query_params.get("s","")
+    if not key or not secret:
+        raise HTTPException(status_code=401, detail="Pass ?k=KEY&s=SECRET")
+    headers = {"x-api-key": key, "x-api-secret": secret, "Accept": "application/json"}
+    to_date = datetime.utcnow().date()
+    from_date = to_date - timedelta(days=3)
+    async with httpx.AsyncClient(timeout=15) as client:
+        r1 = await client.get(f"{BASE}/api/external/v1/earnings",
+            params={"fromDate":str(from_date),"toDate":str(to_date),"page":0,"size":3},
+            headers=headers)
+        r2 = await client.get(f"{BASE}/api/external/v1/revenue",
+            params={}, headers=headers)
+    return {
+        "earnings_status": r1.status_code,
+        "earnings_raw": r1.json() if r1.status_code==200 else r1.text,
+        "revenue_status": r2.status_code,
+        "revenue_raw": r2.json() if r2.status_code==200 else r2.text
+    }
 
 @app.get("/health")
 async def health():
