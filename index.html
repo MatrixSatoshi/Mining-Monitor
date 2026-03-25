@@ -279,8 +279,12 @@
         <div class="earn-grid">
           <div class="ecard hi"><div class="ecard-lbl">Não pago</div><div class="ecard-val" id="eUnpaid">—</div><div class="ecard-sub">BTC pendente</div></div>
           <div class="ecard est"><div class="ecard-lbl">Hoje (estimado)</div><div class="ecard-val" id="eToday">—</div><div class="ecard-sub">a acumular hoje</div></div>
-          <div class="ecard btc"><div class="ecard-lbl">Este mês</div><div class="ecard-val" id="eMonth">—</div><div class="ecard-sub">BTC mês actual</div></div>
-          <div class="ecard"><div class="ecard-lbl">30 dias</div><div class="ecard-val" id="e30d">—</div><div class="ecard-sub">BTC total</div></div>
+          <div class="ecard"><div class="ecard-lbl">Ontem</div><div class="ecard-val" id="eYesterday">—</div><div class="ecard-sub">BTC dia anterior</div></div>
+          <div class="ecard btc"><div class="ecard-lbl">Este mês</div><div class="ecard-val" id="eMonth">—</div><div class="ecard-sub">pagamentos do mês</div></div>
+        </div>
+        <div class="ecard" style="flex-direction:row;align-items:center;justify-content:space-between;padding:12px 16px;">
+          <div><div class="ecard-lbl">30 dias</div><div class="ecard-sub">total earnings</div></div>
+          <div class="ecard-val" id="e30d" style="font-size:20px">—</div>
         </div>
         <div class="earn-sec">Histórico (30 dias)</div>
         <div id="earnList"><div class="state"><div class="spin"></div></div></div>
@@ -438,13 +442,11 @@ async function fetchEarnings(){
   if(!cfg.apiKey||!cfg.apiSecret||!cfg.proxyUrl){useDemoEarnings();return;}
   try{
     earnings=await apiFetch(`/earnings?subaccount=${enc(cfg.subaccount)}`);
-    // Also fetch estimated for today
     try{
       const est=await apiFetch(`/estimated?subaccount=${enc(cfg.subaccount)}`);
-      renderEarnings(est.today_estimated||0);
-    }catch{renderEarnings(0);}
+      renderEarnings(est.today_estimated||0, est.yesterday_estimated||0);
+    }catch{renderEarnings(0,0);}
   }catch(e){
-    // Silent fail - don't show red banner for earnings errors
     document.getElementById('earnList').innerHTML=`<div class="state"><span style="color:var(--text3)">Earnings indisponíveis</span></div>`;
   }
 }
@@ -499,7 +501,7 @@ function useDemoEarnings(){
     return{date:d.toISOString().split('T')[0],amount:(0.00038+Math.random()*0.00025).toFixed(8),
       fee:(0.0000045).toFixed(8),status:i===0?'NEW':i<3?'POSTED':'CONFIRMED'};
   });
-  renderEarnings(0.00042);
+  renderEarnings(0.00042, 0.00092);
 }
 
 function useDemoPayments(){
@@ -615,20 +617,25 @@ function drawChart(hist){
   ctx.beginPath();ctx.arc(lx,ly,3,0,Math.PI*2);ctx.fillStyle='#00d68f';ctx.fill();
 }
 
-function renderEarnings(todayEstimated=0){
+function renderEarnings(todayEstimated=0, yesterdayEstimated=0){
   if(!earnings.length){document.getElementById('earnList').innerHTML=`<div class="state"><span>Sem dados</span></div>`;return;}
-  const today=new Date().toISOString().split('T')[0];
-  const mon=today.substring(0,7);
-  let unpaid=0,monA=0,tot=0;
+  const mon=new Date().toISOString().substring(0,7);
+  let unpaid=0, tot30=0;
   earnings.forEach(e=>{
-    const a=parseFloat(e.amount)||0;tot+=a;
-    if((e.date||'').startsWith(mon))monA+=a;
+    const a=parseFloat(e.amount)||0;
+    tot30+=a;
     if(e.status==='NEW'||e.status==='POSTED')unpaid+=a;
   });
+  // Este mês = somatório dos payments do mês actual
+  const monthFromPayments=payments
+    .filter(p=>(p.date||'').startsWith(mon))
+    .reduce((s,p)=>s+(parseFloat(p.amount)||0),0);
+
   document.getElementById('eUnpaid').textContent=unpaid.toFixed(6);
   document.getElementById('eToday').textContent=(todayEstimated||0).toFixed(6);
-  document.getElementById('eMonth').textContent=monA.toFixed(6);
-  document.getElementById('e30d').textContent=tot.toFixed(6);
+  document.getElementById('eYesterday').textContent=(yesterdayEstimated||0).toFixed(6);
+  document.getElementById('eMonth').textContent=monthFromPayments.toFixed(6);
+  document.getElementById('e30d').textContent=tot30.toFixed(6);
   document.getElementById('earnList').innerHTML=earnings.map(e=>{
     const sc=(e.status||'').toLowerCase();
     const dateDisplay=e.date||'—';
