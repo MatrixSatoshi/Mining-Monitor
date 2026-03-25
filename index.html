@@ -639,8 +639,13 @@ function renderEarnings(todayEstimated=0, yesterdayEstimated=0){
   document.getElementById('earnList').innerHTML=earnings.map(e=>{
     const sc=(e.status||'').toLowerCase();
     const dateDisplay=e.date||'—';
+    const hr=parseFloat(e.hashrate||0);
+    const hrDisplay=hr>0?(hr/1000000).toFixed(3)+' PH/s':'—';
     return`<div class="earn-row">
-      <div class="er-left"><div class="er-date">${dateDisplay}</div><div class="er-sub">Fee: ${parseFloat(e.fee||0).toFixed(8)} BTC</div></div>
+      <div class="er-left">
+        <div class="er-date">${dateDisplay}</div>
+        <div class="er-sub">HR médio: ${hrDisplay} · Fee: ${parseFloat(e.fee||0).toFixed(8)} BTC</div>
+      </div>
       <div class="er-right"><div class="er-amt">₿ ${parseFloat(e.amount||0).toFixed(8)}</div><span class="chip ${sc}">${e.status||'—'}</span></div>
     </div>`;}).join('');
 }
